@@ -29,6 +29,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/agent/files/metadata/suggest", h.suggestMetadata)
 	mux.HandleFunc("POST /api/v1/agent/files/audit/suggest", h.suggestAudit)
 	mux.HandleFunc("POST /api/v1/agent/favorites/organize", h.organizeFavorites)
+	mux.HandleFunc("POST /api/v1/agent/reports/summarize", h.summarizeReports)
 	return withCORS(mux)
 }
 
@@ -117,6 +118,25 @@ func (h *Handler) organizeFavorites(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.service.OrganizeFavorites(requestContext(r), req)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) summarizeReports(w http.ResponseWriter, r *http.Request) {
+	var req domain.ReportSummarizeRequest
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if req.ReportID <= 0 && req.FileID <= 0 && req.UserID <= 0 && strings.TrimSpace(req.Result) == "" {
+		writeError(w, http.StatusBadRequest, errors.New("reportId, fileId, userId, or result is required"))
+		return
+	}
+
+	resp, err := h.service.SummarizeReports(requestContext(r), req)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

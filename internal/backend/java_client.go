@@ -157,6 +157,71 @@ func (c *JavaClient) ListFavorites(ctx context.Context, userID int64, pageNum in
 	return c.enrichFiles(ctx, items), nil
 }
 
+func (c *JavaClient) ListReports(ctx context.Context, req domain.ReportQuery) ([]domain.ReportItem, error) {
+	if c.baseURL == "" {
+		log.Printf("skip backend report list: PEZMAX_BACKEND_BASE_URL is empty")
+		return nil, nil
+	}
+	if req.PageNum <= 0 {
+		req.PageNum = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 50
+	}
+
+	values := url.Values{}
+	if req.FileID > 0 {
+		values.Set("fileId", strconv.FormatInt(req.FileID, 10))
+	}
+	if req.UserID > 0 {
+		values.Set("userId", strconv.FormatInt(req.UserID, 10))
+	}
+	if req.Result != "" {
+		values.Set("result", req.Result)
+	}
+	values.Set("pageNum", strconv.Itoa(req.PageNum))
+	values.Set("pageSize", strconv.Itoa(req.PageSize))
+
+	body, err := c.get(ctx, "/datum/report/list", values)
+	if err != nil {
+		return nil, err
+	}
+	reports, err := decodeReportItems(body)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("backend report list decoded rows=%d", len(reports))
+	return reports, nil
+}
+
+func (c *JavaClient) GetReport(ctx context.Context, reportID int64) (*domain.ReportItem, error) {
+	if c.baseURL == "" {
+		log.Printf("skip backend report detail: PEZMAX_BACKEND_BASE_URL is empty")
+		return nil, nil
+	}
+	body, err := c.get(ctx, fmt.Sprintf("/datum/report/%d", reportID), nil)
+	if err != nil {
+		return nil, err
+	}
+	report, err := decodeReportItem(body)
+	if err == nil && report != nil {
+		return report, nil
+	}
+
+	reports, listErr := c.ListReports(ctx, domain.ReportQuery{
+		ReportID: reportID,
+		PageNum:  1,
+		PageSize: 1,
+	})
+	if listErr != nil {
+		return nil, err
+	}
+	if len(reports) == 0 {
+		return nil, fmt.Errorf("backend report %d not found", reportID)
+	}
+	return &reports[0], nil
+}
+
 func (c *JavaClient) enrichFiles(ctx context.Context, items []domain.FileItem) []domain.FileItem {
 	for i := range items {
 		if items[i].FileID == 0 || (items[i].School != "" && items[i].Subject != "") {
@@ -328,6 +393,73 @@ func decodeFileItems(body []byte) ([]domain.FileItem, error) {
 	}
 	var dataTable struct {
 		Rows []domain.FileItem `json:"rows"`
+	}
+	if err := json.Unmarshal(ajax.Data, &dataTable); err != nil {
+		return nil, err
+	}
+	return dataTable.Rows, nil
+}
+
+func decodeReportItem(body []byte) (*domain.ReportItem, error) {
+	var item domain.ReportItem
+	if err := json.Unmarshal(body, &item); err == nil && item.ReportID != 0 {
+		return &item, nil
+	}
+
+	var ajax struct {
+		Code int             `json:"code"`
+		Msg  string          `json:"msg"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(body, &ajax); err != nil {
+		return nil, err
+	}
+	if ajax.Code != 0 && ajax.Code != 200 {
+		return nil, fmt.Errorf("backend returned code=%d msg=%s", ajax.Code, ajax.Msg)
+	}
+	if len(ajax.Data) == 0 || string(ajax.Data) == "null" {
+		return nil, fmt.Errorf("backend returned empty report data")
+	}
+	if err := json.Unmarshal(ajax.Data, &item); err != nil {
+		return nil, err
+	}
+	if item.ReportID == 0 {
+		return nil, fmt.Errorf("backend returned invalid report data")
+	}
+	return &item, nil
+}
+
+func decodeReportItems(body []byte) ([]domain.ReportItem, error) {
+	var direct []domain.ReportItem
+	if err := json.Unmarshal(body, &direct); err == nil {
+		return direct, nil
+	}
+
+	var table struct {
+		Rows []domain.ReportItem `json:"rows"`
+	}
+	if err := json.Unmarshal(body, &table); err == nil && table.Rows != nil {
+		return table.Rows, nil
+	}
+
+	var ajax struct {
+		Data json.RawMessage     `json:"data"`
+		Rows []domain.ReportItem `json:"rows"`
+	}
+	if err := json.Unmarshal(body, &ajax); err != nil {
+		return nil, err
+	}
+	if len(ajax.Rows) > 0 {
+		return ajax.Rows, nil
+	}
+	if len(ajax.Data) == 0 {
+		return nil, nil
+	}
+	if err := json.Unmarshal(ajax.Data, &direct); err == nil {
+		return direct, nil
+	}
+	var dataTable struct {
+		Rows []domain.ReportItem `json:"rows"`
 	}
 	if err := json.Unmarshal(ajax.Data, &dataTable); err != nil {
 		return nil, err

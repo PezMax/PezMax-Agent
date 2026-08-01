@@ -190,6 +190,34 @@ The response contains grouped favorite files, group priority, and suggestions:
 }
 ```
 
+### Summarize reports
+
+Summarize one report:
+
+```http
+POST /api/v1/agent/reports/summarize
+Content-Type: application/json
+
+{
+  "reportId": 1
+}
+```
+
+Summarize pending reports for one file:
+
+```http
+POST /api/v1/agent/reports/summarize
+Content-Type: application/json
+
+{
+  "fileId": 964,
+  "result": "0",
+  "pageSize": 20
+}
+```
+
+The response contains report clues, related file metadata, audit risk, and next actions.
+
 ## Verify
 
 ```powershell

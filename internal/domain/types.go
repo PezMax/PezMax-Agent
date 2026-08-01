@@ -85,6 +85,55 @@ type FavoriteGroup struct {
 	Items    []FileItem `json:"items"`
 }
 
+type ReportSummarizeRequest struct {
+	ReportID int64  `json:"reportId,omitempty"`
+	FileID   int64  `json:"fileId,omitempty"`
+	UserID   int64  `json:"userId,omitempty"`
+	Result   string `json:"result,omitempty"`
+	PageNum  int    `json:"pageNum,omitempty"`
+	PageSize int    `json:"pageSize,omitempty"`
+}
+
+type ReportSummarizeResponse struct {
+	Intent      string          `json:"intent"`
+	Filters     ReportQuery     `json:"filters"`
+	Reports     []ReportSummary `json:"reports"`
+	RiskLevel   string          `json:"riskLevel"`
+	Suggestions []string        `json:"suggestions,omitempty"`
+	Summary     string          `json:"summary"`
+}
+
+type ReportQuery struct {
+	ReportID int64  `json:"reportId,omitempty"`
+	FileID   int64  `json:"fileId,omitempty"`
+	UserID   int64  `json:"userId,omitempty"`
+	Result   string `json:"result,omitempty"`
+	PageNum  int    `json:"pageNum,omitempty"`
+	PageSize int    `json:"pageSize,omitempty"`
+}
+
+type ReportItem struct {
+	ReportID   int64  `json:"reportId"`
+	FileID     int64  `json:"fileId,omitempty"`
+	UserID     int64  `json:"userId,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+	Result     string `json:"result,omitempty"`
+	CreateBy   string `json:"createBy,omitempty"`
+	CreateTime string `json:"createTime,omitempty"`
+	UpdateBy   string `json:"updateBy,omitempty"`
+	UpdateTime string `json:"updateTime,omitempty"`
+	Remark     string `json:"remark,omitempty"`
+}
+
+type ReportSummary struct {
+	Report       ReportItem      `json:"report"`
+	File         *FileItem       `json:"file,omitempty"`
+	Audit        AuditSuggestion `json:"audit"`
+	Clues        []string        `json:"clues"`
+	NextActions  []string        `json:"nextActions"`
+	TimelineText string          `json:"timelineText,omitempty"`
+}
+
 type MetadataSuggestRequest struct {
 	FileName     string `json:"fileName"`
 	OriginalName string `json:"originalName,omitempty"`
