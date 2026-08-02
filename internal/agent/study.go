@@ -195,26 +195,79 @@ func chatStudyPlanRequest(userID int64, text string) domain.StudyPlanRequest {
 }
 
 func extractDays(text string) int {
-	re := regexp.MustCompile(`(\d+)\s*(天|日|周|星期|个星期)`)
+	re := regexp.MustCompile(`(\d+)\s*(个星期|星期|周|个月|月|天|日)`)
 	match := re.FindStringSubmatch(text)
 	if len(match) >= 3 {
 		value, _ := strconv.Atoi(match[1])
-		if strings.Contains(match[2], "周") || strings.Contains(match[2], "星期") {
+		switch {
+		case strings.Contains(match[2], "月"):
+			return value * 30
+		case strings.Contains(match[2], "周") || strings.Contains(match[2], "星期"):
 			return value * 7
+		default:
+			return value
 		}
-		return value
 	}
 
-	chineseWeeks := map[string]int{
-		"一周": 7, "一星期": 7, "一个星期": 7,
-		"两周": 14, "二周": 14, "两星期": 14, "二星期": 14, "两个星期": 14,
-		"三周": 21, "三星期": 21, "三个星期": 21,
-		"四周": 28, "四星期": 28, "四个星期": 28,
+	if strings.Contains(text, "半个月") {
+		return 15
 	}
-	for keyword, days := range chineseWeeks {
-		if strings.Contains(text, keyword) {
-			return days
+
+	chineseRe := regexp.MustCompile(`([一二两三四五六七八九十]+)\s*(个星期|星期|周|个月|月|天|日)`)
+	chineseMatch := chineseRe.FindStringSubmatch(text)
+	if len(chineseMatch) >= 3 {
+		value := chineseNumberToInt(chineseMatch[1])
+		if value <= 0 {
+			return 0
 		}
+		switch {
+		case strings.Contains(chineseMatch[2], "月"):
+			return value * 30
+		case strings.Contains(chineseMatch[2], "周") || strings.Contains(chineseMatch[2], "星期"):
+			return value * 7
+		default:
+			return value
+		}
+	}
+	return 0
+}
+
+func chineseNumberToInt(text string) int {
+	digits := map[rune]int{
+		'一': 1,
+		'二': 2,
+		'两': 2,
+		'三': 3,
+		'四': 4,
+		'五': 5,
+		'六': 6,
+		'七': 7,
+		'八': 8,
+		'九': 9,
+	}
+	if text == "十" {
+		return 10
+	}
+	if strings.Contains(text, "十") {
+		parts := strings.Split(text, "十")
+		tens := 1
+		if parts[0] != "" {
+			for _, r := range parts[0] {
+				tens = digits[r]
+				break
+			}
+		}
+		ones := 0
+		if len(parts) > 1 && parts[1] != "" {
+			for _, r := range parts[1] {
+				ones = digits[r]
+				break
+			}
+		}
+		return tens*10 + ones
+	}
+	for _, r := range text {
+		return digits[r]
 	}
 	return 0
 }
