@@ -97,6 +97,43 @@ type FileRecommendResponse struct {
 	Summary         string             `json:"summary"`
 }
 
+type StudyPlanRequest struct {
+	UserID      int64   `json:"userId,omitempty"`
+	Goal        string  `json:"goal"`
+	Subject     string  `json:"subject,omitempty"`
+	Days        int     `json:"days,omitempty"`
+	HoursPerDay float64 `json:"hoursPerDay,omitempty"`
+	School      string  `json:"school,omitempty"`
+	Year        int     `json:"year,omitempty"`
+}
+
+type StudyPlanResponse struct {
+	Intent           string             `json:"intent"`
+	Goal             string             `json:"goal"`
+	Subject          string             `json:"subject,omitempty"`
+	Days             int                `json:"days"`
+	HoursPerDay      float64            `json:"hoursPerDay"`
+	Plan             []StudyPlanDay     `json:"plan"`
+	RecommendedFiles []FileSearchResult `json:"recommendedFiles,omitempty"`
+	Suggestions      []string           `json:"suggestions,omitempty"`
+	Summary          string             `json:"summary"`
+}
+
+type StudyPlanDay struct {
+	Day              int         `json:"day"`
+	Title            string      `json:"title"`
+	Focus            string      `json:"focus,omitempty"`
+	Tasks            []StudyTask `json:"tasks"`
+	RecommendedFiles []FileItem  `json:"recommendedFiles,omitempty"`
+}
+
+type StudyTask struct {
+	Type    string `json:"type"`
+	Title   string `json:"title"`
+	Detail  string `json:"detail,omitempty"`
+	Minutes int    `json:"minutes"`
+}
+
 type FavoriteOrganizeRequest struct {
 	UserID   int64  `json:"userId"`
 	GroupBy  string `json:"groupBy,omitempty"`

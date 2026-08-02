@@ -28,6 +28,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/agent/files/recommend", h.recommendFiles)
 	mux.HandleFunc("POST /api/v1/agent/files/metadata/suggest", h.suggestMetadata)
 	mux.HandleFunc("POST /api/v1/agent/files/audit/suggest", h.suggestAudit)
+	mux.HandleFunc("POST /api/v1/agent/study/plan", h.generateStudyPlan)
 	mux.HandleFunc("POST /api/v1/agent/favorites/organize", h.organizeFavorites)
 	mux.HandleFunc("POST /api/v1/agent/reports/summarize", h.summarizeReports)
 	mux.HandleFunc("POST /api/v1/agent/ops/insights", h.opsInsights)
@@ -96,6 +97,25 @@ func (h *Handler) recommendFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.service.RecommendFiles(requestContext(r), req)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) generateStudyPlan(w http.ResponseWriter, r *http.Request) {
+	var req domain.StudyPlanRequest
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if strings.TrimSpace(req.Goal) == "" && strings.TrimSpace(req.Subject) == "" {
+		writeError(w, http.StatusBadRequest, errors.New("goal or subject is required"))
+		return
+	}
+
+	resp, err := h.service.GenerateStudyPlan(requestContext(r), req)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
