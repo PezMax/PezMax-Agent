@@ -11,6 +11,7 @@ import (
 	"PezMax-Agent/internal/backend"
 	"PezMax-Agent/internal/config"
 	pezllm "PezMax-Agent/internal/llm"
+	"PezMax-Agent/internal/websearch"
 )
 
 func main() {
@@ -23,7 +24,7 @@ func main() {
 	}
 
 	backendClient := backend.NewJavaClient(cfg)
-	service := agent.NewService(chatModel, backendClient)
+	service := agent.NewService(chatModel, backendClient, websearch.NewFromEnv())
 	handler := api.NewHandler(service)
 
 	server := &http.Server{

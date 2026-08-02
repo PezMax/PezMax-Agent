@@ -113,8 +113,11 @@ type StudyPlanResponse struct {
 	Subject          string             `json:"subject,omitempty"`
 	Days             int                `json:"days"`
 	HoursPerDay      float64            `json:"hoursPerDay"`
+	HasPlatformFiles bool               `json:"hasPlatformFiles"`
+	MaterialAnalysis string             `json:"materialAnalysis,omitempty"`
 	Plan             []StudyPlanDay     `json:"plan"`
 	RecommendedFiles []FileSearchResult `json:"recommendedFiles,omitempty"`
+	WebSources       []WebSearchResult  `json:"webSources,omitempty"`
 	Suggestions      []string           `json:"suggestions,omitempty"`
 	Summary          string             `json:"summary"`
 }
@@ -132,6 +135,51 @@ type StudyTask struct {
 	Title   string `json:"title"`
 	Detail  string `json:"detail,omitempty"`
 	Minutes int    `json:"minutes"`
+}
+
+type MockExamRequest struct {
+	UserID        int64   `json:"userId,omitempty"`
+	Subject       string  `json:"subject,omitempty"`
+	School        string  `json:"school,omitempty"`
+	Year          int     `json:"year,omitempty"`
+	FileIDs       []int64 `json:"fileIds,omitempty"`
+	QuestionCount int     `json:"questionCount,omitempty"`
+	Difficulty    string  `json:"difficulty,omitempty"`
+	Goal          string  `json:"goal,omitempty"`
+}
+
+type MockExamResponse struct {
+	Intent           string             `json:"intent"`
+	Subject          string             `json:"subject,omitempty"`
+	School           string             `json:"school,omitempty"`
+	Year             int                `json:"year,omitempty"`
+	HasPastPapers    bool               `json:"hasPastPapers"`
+	PaperAnalysis    string             `json:"paperAnalysis,omitempty"`
+	SourceFiles      []FileItem         `json:"sourceFiles,omitempty"`
+	WebSources       []WebSearchResult  `json:"webSources,omitempty"`
+	Questions        []MockQuestion     `json:"questions"`
+	RecommendedFiles []FileSearchResult `json:"recommendedFiles,omitempty"`
+	Suggestions      []string           `json:"suggestions,omitempty"`
+	Summary          string             `json:"summary"`
+}
+
+type MockQuestion struct {
+	Number      int      `json:"number"`
+	Type        string   `json:"type"`
+	Topic       string   `json:"topic,omitempty"`
+	Difficulty  string   `json:"difficulty,omitempty"`
+	Stem        string   `json:"stem"`
+	Options     []string `json:"options,omitempty"`
+	Answer      string   `json:"answer,omitempty"`
+	Analysis    string   `json:"analysis,omitempty"`
+	SourceBasis string   `json:"sourceBasis,omitempty"`
+}
+
+type WebSearchResult struct {
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Snippet string `json:"snippet"`
+	Source  string `json:"source,omitempty"`
 }
 
 type FavoriteOrganizeRequest struct {

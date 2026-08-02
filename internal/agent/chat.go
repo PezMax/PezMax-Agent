@@ -8,6 +8,18 @@ import (
 )
 
 func (s *Service) Chat(ctx context.Context, req domain.ChatRequest) (domain.ChatResponse, error) {
+	if looksLikeMockExam(req.Message) {
+		exam, err := s.GenerateMockExam(ctx, chatMockExamRequest(req.UserID, req.Message))
+		if err != nil {
+			return domain.ChatResponse{}, err
+		}
+		return domain.ChatResponse{
+			Intent: "mock_exam",
+			Answer: exam.Summary,
+			Data:   exam,
+		}, nil
+	}
+
 	if looksLikeStudyPlan(req.Message) {
 		plan, err := s.GenerateStudyPlan(ctx, chatStudyPlanRequest(req.UserID, req.Message))
 		if err != nil {
@@ -163,5 +175,5 @@ func containsAny(text string, keywords ...string) bool {
 }
 
 func chatFallbackAnswer() string {
-	return "我可以帮你找资料、推荐资料、生成学习计划、整理收藏、分析举报和查看运营洞察。"
+	return "我可以帮你找资料、推荐资料、生成学习计划、根据真题出模拟题、整理收藏、分析举报和查看运营洞察。"
 }

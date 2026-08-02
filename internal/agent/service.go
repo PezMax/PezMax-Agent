@@ -7,17 +7,19 @@ import (
 
 	"PezMax-Agent/internal/backend"
 	pezllm "PezMax-Agent/internal/llm"
+	"PezMax-Agent/internal/websearch"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 )
 
 type Service struct {
-	model   pezllm.ChatModel
-	backend backend.Client
+	model     pezllm.ChatModel
+	backend   backend.Client
+	webSearch websearch.Client
 }
 
-func NewService(model pezllm.ChatModel, backend backend.Client) *Service {
-	return &Service{model: model, backend: backend}
+func NewService(model pezllm.ChatModel, backend backend.Client, webSearch websearch.Client) *Service {
+	return &Service{model: model, backend: backend, webSearch: webSearch}
 }
 
 func (s *Service) generate(ctx context.Context, systemPrompt, userPrompt string) (*schema.Message, error) {
@@ -30,6 +32,8 @@ func (s *Service) generate(ctx context.Context, systemPrompt, userPrompt string)
 const searchSystemPrompt = "你是 PezMax 试题下载平台的搜索参数抽取助手。你必须输出严格 JSON，不要解释。"
 const metadataSystemPrompt = "你是 PezMax 试题下载平台的上传资料元数据补全助手。你必须输出严格 JSON，不要解释。"
 const auditSystemPrompt = "你是 PezMax 试题下载平台的审核辅助助手。你必须输出严格 JSON，不要解释。"
+const studySystemPrompt = "你是 PezMax 试题下载平台的学习规划智能体。你必须基于平台资料、网络搜索摘要和科目知识结构生成具体可执行计划，并输出严格 JSON。"
+const mockExamSystemPrompt = "你是 PezMax 试题下载平台的模拟题生成智能体。你必须根据平台真题资料、网络题型摘要和科目知识结构生成原创模拟题，并输出严格 JSON。"
 const chatSystemPrompt = "你是 PezMax 试题下载平台助手，回答要简洁、准确，优先围绕找资料、上传资料和审核建议。"
 
 func containsFold(text, keyword string) bool {

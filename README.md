@@ -9,9 +9,11 @@ It is intentionally decoupled from the current Java backend. The agent talks to 
 - Natural-language file search
 - Upload metadata suggestion
 - File audit suggestion
-- Basic chat entry for routing search-like requests
+- File recommendations
+- Study plan generation from platform materials and optional web search sources
+- Basic chat entry for routing search, recommendation, study plan, favorite, report, and ops requests
 
-The service can start without an LLM API key. In that mode it uses rule-based fallbacks. When `DASHSCOPE_API_KEY` is configured, Eino is used to call a DashScope OpenAI-compatible chat model for better extraction and suggestions.
+The service can start without an LLM API key. In that mode it uses rule-based fallbacks. When `DASHSCOPE_API_KEY` is configured, Eino is used to call a DashScope OpenAI-compatible chat model for better extraction and suggestions. Study plans can also use an optional web search provider.
 
 ## Run
 
@@ -33,7 +35,17 @@ PEZMAX_LLM_MODEL=qwen-plus
 PEZMAX_LLM_TEMPERATURE=0.2
 PEZMAX_LLM_MAX_TOKENS=1200
 DASHSCOPE_API_KEY=
+PEZMAX_WEB_SEARCH_PROVIDER=tavily|serpapi|searxng
+PEZMAX_WEB_SEARCH_API_KEY=
+PEZMAX_WEB_SEARCH_BASE_URL=
+PEZMAX_WEB_SEARCH_TIMEOUT_SECONDS=12
 ```
+
+Web search provider notes:
+
+- `tavily`: set `TAVILY_API_KEY` or `PEZMAX_WEB_SEARCH_API_KEY`.
+- `serpapi`: set `SERPAPI_API_KEY` or `PEZMAX_WEB_SEARCH_API_KEY`.
+- `searxng`: set `PEZMAX_WEB_SEARCH_BASE_URL` to a SearXNG instance URL.
 
 ## APIs
 
@@ -155,6 +167,62 @@ The response contains scored recommendations and reasons:
   ]
 }
 ```
+
+### Study plan
+
+```http
+POST /api/v1/agent/study/plan
+Content-Type: application/json
+
+{
+  "goal": "一个月复习高等数学期末，每天 2 小时",
+  "subject": "高等数学",
+  "days": 30,
+  "hoursPerDay": 2,
+  "school": "齐鲁工业大学",
+  "year": 2024
+}
+```
+
+The agent first searches platform files. If no matching papers or materials exist, the response explicitly says so and uses web search sources, when configured, to provide appropriate study advice.
+For web results, the agent also attempts to fetch HTML/text page excerpts for content analysis. PDF OCR/text extraction is not included yet, so PDF-only pages are summarized from search snippets unless a future document extractor is added.
+
+```json
+{
+  "intent": "study_plan",
+  "hasPlatformFiles": true,
+  "materialAnalysis": "平台检索到 8 份高等数学相关资料...",
+  "webSources": [],
+  "plan": []
+}
+```
+
+### Mock exam from past papers
+
+```http
+POST /api/v1/agent/study/mock-exam
+Content-Type: application/json
+
+{
+  "subject": "高等数学",
+  "school": "齐鲁工业大学",
+  "year": 2024,
+  "questionCount": 8,
+  "difficulty": "中等",
+  "goal": "根据期末真题出一套模拟题"
+}
+```
+
+You can also provide specific source papers:
+
+```json
+{
+  "fileIds": [964],
+  "questionCount": 10
+}
+```
+
+The agent searches platform past papers first. If no platform papers are found, the response says so explicitly and generates practice questions from web sources and subject knowledge structure.
 
 ### Organize favorites
 

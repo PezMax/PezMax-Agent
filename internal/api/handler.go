@@ -29,6 +29,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/agent/files/metadata/suggest", h.suggestMetadata)
 	mux.HandleFunc("POST /api/v1/agent/files/audit/suggest", h.suggestAudit)
 	mux.HandleFunc("POST /api/v1/agent/study/plan", h.generateStudyPlan)
+	mux.HandleFunc("POST /api/v1/agent/study/mock-exam", h.generateMockExam)
 	mux.HandleFunc("POST /api/v1/agent/favorites/organize", h.organizeFavorites)
 	mux.HandleFunc("POST /api/v1/agent/reports/summarize", h.summarizeReports)
 	mux.HandleFunc("POST /api/v1/agent/ops/insights", h.opsInsights)
@@ -116,6 +117,25 @@ func (h *Handler) generateStudyPlan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.service.GenerateStudyPlan(requestContext(r), req)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) generateMockExam(w http.ResponseWriter, r *http.Request) {
+	var req domain.MockExamRequest
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if strings.TrimSpace(req.Subject) == "" && strings.TrimSpace(req.Goal) == "" && len(req.FileIDs) == 0 {
+		writeError(w, http.StatusBadRequest, errors.New("subject, goal, or fileIds is required"))
+		return
+	}
+
+	resp, err := h.service.GenerateMockExam(requestContext(r), req)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
