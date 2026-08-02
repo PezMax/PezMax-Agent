@@ -18,10 +18,11 @@ func (s *Service) GenerateMockExam(ctx context.Context, req domain.MockExamReque
 	}
 	enrichMockExamRequestFromFiles(&req, sourceFiles)
 
+	documentTexts := s.extractMockExamDocuments(ctx, sourceFiles)
 	webSources, webErr := s.searchMockExamWebSources(ctx, req)
-	analysis := analyzeMockExamSources(req, sourceFiles, webSources, webErr)
+	analysis := analyzeMockExamSources(req, sourceFiles, documentTexts, webSources, webErr)
 	if s.model != nil {
-		aiExam, err := s.generateMockExamWithLLM(ctx, req, sourceFiles, webSources, analysis)
+		aiExam, err := s.generateMockExamWithLLM(ctx, req, sourceFiles, documentTexts, webSources, analysis)
 		if err == nil && len(aiExam.Questions) > 0 {
 			aiExam.Intent = "mock_exam"
 			aiExam.Subject = req.Subject
@@ -30,16 +31,17 @@ func (s *Service) GenerateMockExam(ctx context.Context, req domain.MockExamReque
 			aiExam.HasPastPapers = len(sourceFiles) > 0
 			aiExam.PaperAnalysis = analysis
 			aiExam.SourceFiles = sourceFiles
+			aiExam.DocumentTexts = documentTexts
 			aiExam.WebSources = webSources
 			aiExam.RecommendedFiles = searchResults
 			if aiExam.Summary == "" {
-				aiExam.Summary = summarizeMockExam(req, len(sourceFiles), len(webSources))
+				aiExam.Summary = summarizeMockExam(req, len(sourceFiles), countExtractedDocuments(documentTexts), len(webSources))
 			}
 			return aiExam, nil
 		}
 	}
 
-	questions := buildFallbackMockQuestions(req, sourceFiles, webSources)
+	questions := buildFallbackMockQuestions(req, sourceFiles, documentTexts, webSources)
 	return domain.MockExamResponse{
 		Intent:           "mock_exam",
 		Subject:          req.Subject,
@@ -48,11 +50,12 @@ func (s *Service) GenerateMockExam(ctx context.Context, req domain.MockExamReque
 		HasPastPapers:    len(sourceFiles) > 0,
 		PaperAnalysis:    analysis,
 		SourceFiles:      sourceFiles,
+		DocumentTexts:    documentTexts,
 		WebSources:       webSources,
 		Questions:        questions,
 		RecommendedFiles: searchResults,
-		Suggestions:      buildMockExamSuggestions(req, sourceFiles, webSources, webErr),
-		Summary:          summarizeMockExam(req, len(sourceFiles), len(webSources)),
+		Suggestions:      buildMockExamSuggestions(req, sourceFiles, documentTexts, webSources, webErr),
+		Summary:          summarizeMockExam(req, len(sourceFiles), countExtractedDocuments(documentTexts), len(webSources)),
 	}, nil
 }
 
@@ -141,6 +144,29 @@ func (s *Service) loadMockExamSources(ctx context.Context, req domain.MockExamRe
 	return files, search.Results, nil
 }
 
+func (s *Service) extractMockExamDocuments(ctx context.Context, files []domain.FileItem) []domain.DocumentText {
+	if s.document == nil || len(files) == 0 {
+		return nil
+	}
+	out := make([]domain.DocumentText, 0, minInt(len(files), 4))
+	for _, file := range files {
+		if len(out) >= 4 {
+			break
+		}
+		if !looksLikeReadableDocument(file) {
+			continue
+		}
+		out = append(out, s.document.ExtractFileText(ctx, file, 5000))
+	}
+	return out
+}
+
+func looksLikeReadableDocument(file domain.FileItem) bool {
+	format := strings.Trim(strings.ToLower(file.Format), ". ")
+	nameURL := strings.ToLower(file.Name + " " + file.URL)
+	return format == "pdf" || format == "txt" || format == "text" || strings.Contains(nameURL, ".pdf") || strings.Contains(nameURL, ".txt")
+}
+
 func (s *Service) searchMockExamWebSources(ctx context.Context, req domain.MockExamRequest) ([]domain.WebSearchResult, error) {
 	if s.webSearch == nil {
 		return nil, fmt.Errorf("web search is not configured")
@@ -168,8 +194,9 @@ func (s *Service) searchMockExamWebSources(ctx context.Context, req domain.MockE
 	return out, nil
 }
 
-func analyzeMockExamSources(req domain.MockExamRequest, files []domain.FileItem, webSources []domain.WebSearchResult, webErr error) string {
+func analyzeMockExamSources(req domain.MockExamRequest, files []domain.FileItem, documentTexts []domain.DocumentText, webSources []domain.WebSearchResult, webErr error) string {
 	subject := firstNonEmpty(req.Subject, "该科目")
+	extractedCount := countExtractedDocuments(documentTexts)
 	if len(files) == 0 {
 		if len(webSources) == 0 {
 			if webErr != nil {
@@ -189,10 +216,13 @@ func analyzeMockExamSources(req domain.MockExamRequest, files []domain.FileItem,
 			schools[file.School] = true
 		}
 	}
-	return fmt.Sprintf("平台找到 %d 份%s真题/期末资料，覆盖 %d 个年份、%d 所学校；模拟题将参考这些资料名称、科目、年份和题型分布，并结合 %d 条网络资源。", len(files), subject, len(years), len(schools), len(webSources))
+	if extractedCount > 0 {
+		return fmt.Sprintf("平台找到 %d 份%s真题/期末资料，覆盖 %d 个年份、%d 所学校；已解析其中 %d 份文件正文，模拟题将优先参考正文题型、章节分布和难度，并结合 %d 条网络资源。", len(files), subject, len(years), len(schools), extractedCount, len(webSources))
+	}
+	return fmt.Sprintf("平台找到 %d 份%s真题/期末资料，覆盖 %d 个年份、%d 所学校；暂未解析到可用正文，模拟题将参考资料名称、科目、年份和题型分布，并结合 %d 条网络资源。", len(files), subject, len(years), len(schools), len(webSources))
 }
 
-func (s *Service) generateMockExamWithLLM(ctx context.Context, req domain.MockExamRequest, files []domain.FileItem, webSources []domain.WebSearchResult, analysis string) (domain.MockExamResponse, error) {
+func (s *Service) generateMockExamWithLLM(ctx context.Context, req domain.MockExamRequest, files []domain.FileItem, documentTexts []domain.DocumentText, webSources []domain.WebSearchResult, analysis string) (domain.MockExamResponse, error) {
 	prompt := fmt.Sprintf(`请根据 PezMax 平台真题资料和网络资源生成一套模拟题，只返回严格 JSON，不要解释。
 
 科目：%s
@@ -203,15 +233,17 @@ func (s *Service) generateMockExamWithLLM(ctx context.Context, req domain.MockEx
 用户目标：%s
 真题资料分析：%s
 平台真题资料：%s
+真题正文摘录：%s
 网络题型资源：%s
 科目知识主题：%s
 
 要求：
 1. 如果平台真题为空，summary 必须明确说明“平台暂未找到可参考真题”，但可以结合网络资源生成练习建议题。
-2. 题目必须是原创模拟题，不能照抄真题原题；要体现真题题型、章节和难度。
-3. questions 数量必须等于题目数量；每题包含 number,type,topic,difficulty,stem,options,answer,analysis,sourceBasis。
-4. 题型混合使用选择题、填空题、计算题、简答题或综合题，按科目自然分布。
-5. 答案和解析要可直接用于学生自测。`,
+2. 优先根据真题正文摘录归纳题型；若正文摘录为空，再使用资料元数据和网络资源。
+3. 题目必须是原创模拟题，不能照抄真题原题；要体现真题题型、章节和难度。
+4. questions 数量必须等于题目数量；每题包含 number,type,topic,difficulty,stem,options,answer,analysis,sourceBasis。
+5. 题型混合使用选择题、填空题、计算题、简答题或综合题，按科目自然分布。
+6. 答案和解析要可直接用于学生自测。`,
 		req.Subject,
 		req.School,
 		req.Year,
@@ -220,6 +252,7 @@ func (s *Service) generateMockExamWithLLM(ctx context.Context, req domain.MockEx
 		req.Goal,
 		analysis,
 		mustJSON(compactStudyFiles(files, 12)),
+		mustJSON(compactDocumentTexts(documentTexts, 4, 1200)),
 		mustJSON(compactWebSources(webSources, 6)),
 		mustJSON(subjectStudyTopics(req.Subject)),
 	)
@@ -234,7 +267,7 @@ func (s *Service) generateMockExamWithLLM(ctx context.Context, req domain.MockEx
 	return out, nil
 }
 
-func buildFallbackMockQuestions(req domain.MockExamRequest, files []domain.FileItem, webSources []domain.WebSearchResult) []domain.MockQuestion {
+func buildFallbackMockQuestions(req domain.MockExamRequest, files []domain.FileItem, documentTexts []domain.DocumentText, webSources []domain.WebSearchResult) []domain.MockQuestion {
 	topics := subjectStudyTopics(req.Subject)
 	types := []string{"选择题", "填空题", "计算题", "简答题", "综合题"}
 	questions := make([]domain.MockQuestion, 0, req.QuestionCount)
@@ -250,7 +283,7 @@ func buildFallbackMockQuestions(req domain.MockExamRequest, files []domain.FileI
 			Options:     fallbackQuestionOptions(qType, topic),
 			Answer:      fallbackQuestionAnswer(qType, topic),
 			Analysis:    fmt.Sprintf("本题考查%s。复习时重点关注：%s", topic.Name, topic.Focus),
-			SourceBasis: fallbackSourceBasis(files, webSources),
+			SourceBasis: fallbackSourceBasis(files, documentTexts, webSources),
 		})
 	}
 	return questions
@@ -290,7 +323,12 @@ func fallbackQuestionAnswer(qType string, topic studyTopic) string {
 	return fmt.Sprintf("答案要点：%s；练习要求：%s", topic.Concepts, topic.ExamTarget)
 }
 
-func fallbackSourceBasis(files []domain.FileItem, webSources []domain.WebSearchResult) string {
+func fallbackSourceBasis(files []domain.FileItem, documentTexts []domain.DocumentText, webSources []domain.WebSearchResult) string {
+	for _, item := range documentTexts {
+		if item.Text != "" {
+			return fmt.Sprintf("参考平台真题正文摘录：%s", item.FileName)
+		}
+	}
 	if len(files) > 0 {
 		return fmt.Sprintf("参考平台真题资料：%s", files[0].Name)
 	}
@@ -300,10 +338,12 @@ func fallbackSourceBasis(files []domain.FileItem, webSources []domain.WebSearchR
 	return "未找到平台真题或网络资源，基于科目知识结构生成。"
 }
 
-func buildMockExamSuggestions(req domain.MockExamRequest, files []domain.FileItem, webSources []domain.WebSearchResult, webErr error) []string {
+func buildMockExamSuggestions(req domain.MockExamRequest, files []domain.FileItem, documentTexts []domain.DocumentText, webSources []domain.WebSearchResult, webErr error) []string {
 	suggestions := []string{"建议先限时完成模拟题，再对照答案整理错题。"}
 	if len(files) == 0 {
 		suggestions = append(suggestions, "平台暂无可参考真题，生成结果更适合作为专项练习，不建议直接当作押题。")
+	} else if countExtractedDocuments(documentTexts) == 0 {
+		suggestions = append(suggestions, "平台已找到真题资料，但暂未解析到正文；如果资料是扫描版 PDF，后续需要接入 OCR 才能识别具体题干。")
 	}
 	if len(webSources) == 0 && webErr != nil {
 		suggestions = append(suggestions, "配置网络搜索工具后，可以结合外部题型资源生成更贴近考试范围的模拟题。")
@@ -311,12 +351,45 @@ func buildMockExamSuggestions(req domain.MockExamRequest, files []domain.FileIte
 	return suggestions
 }
 
-func summarizeMockExam(req domain.MockExamRequest, fileCount, webCount int) string {
+func summarizeMockExam(req domain.MockExamRequest, fileCount, documentCount, webCount int) string {
 	subject := firstNonEmpty(req.Subject, "该科目")
 	if fileCount == 0 {
 		return fmt.Sprintf("平台暂未找到%s可参考真题，已结合 %d 条网络资源线索生成 %d 道模拟练习题。", subject, webCount, req.QuestionCount)
 	}
+	if documentCount > 0 {
+		return fmt.Sprintf("已参考 %d 份%s平台真题/资料，解析 %d 份正文，并结合 %d 条网络资源生成 %d 道模拟题。", fileCount, subject, documentCount, webCount, req.QuestionCount)
+	}
 	return fmt.Sprintf("已参考 %d 份%s平台真题/资料和 %d 条网络资源，生成 %d 道模拟题。", fileCount, subject, webCount, req.QuestionCount)
+}
+
+func countExtractedDocuments(items []domain.DocumentText) int {
+	count := 0
+	for _, item := range items {
+		if strings.TrimSpace(item.Text) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func compactDocumentTexts(items []domain.DocumentText, limit, maxCharsPerFile int) []domain.DocumentText {
+	if limit <= 0 || len(items) == 0 {
+		return nil
+	}
+	out := make([]domain.DocumentText, 0, minInt(len(items), limit))
+	for _, item := range items {
+		if len(out) >= limit {
+			break
+		}
+		if item.Text != "" {
+			runes := []rune(item.Text)
+			if maxCharsPerFile > 0 && len(runes) > maxCharsPerFile {
+				item.Text = string(runes[:maxCharsPerFile])
+			}
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func looksLikeMockExam(text string) bool {

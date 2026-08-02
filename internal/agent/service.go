@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"PezMax-Agent/internal/backend"
+	"PezMax-Agent/internal/document"
 	pezllm "PezMax-Agent/internal/llm"
 	"PezMax-Agent/internal/websearch"
 	"github.com/cloudwego/eino/components/model"
@@ -16,10 +17,11 @@ type Service struct {
 	model     pezllm.ChatModel
 	backend   backend.Client
 	webSearch websearch.Client
+	document  document.Extractor
 }
 
-func NewService(model pezllm.ChatModel, backend backend.Client, webSearch websearch.Client) *Service {
-	return &Service{model: model, backend: backend, webSearch: webSearch}
+func NewService(model pezllm.ChatModel, backend backend.Client, webSearch websearch.Client, documentExtractor document.Extractor) *Service {
+	return &Service{model: model, backend: backend, webSearch: webSearch, document: documentExtractor}
 }
 
 func (s *Service) generate(ctx context.Context, systemPrompt, userPrompt string) (*schema.Message, error) {

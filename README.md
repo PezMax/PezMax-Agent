@@ -13,7 +13,7 @@ It is intentionally decoupled from the current Java backend. The agent talks to 
 - Study plan generation from platform materials and optional web search sources
 - Basic chat entry for routing search, recommendation, study plan, favorite, report, and ops requests
 
-The service can start without an LLM API key. In that mode it uses rule-based fallbacks. When `DASHSCOPE_API_KEY` is configured, Eino is used to call a DashScope OpenAI-compatible chat model for better extraction and suggestions. Study plans can also use an optional web search provider.
+The service can start without an LLM API key. In that mode it uses rule-based fallbacks. When `DASHSCOPE_API_KEY` is configured, Eino is used to call a DashScope OpenAI-compatible chat model for better extraction and suggestions. Study plans and mock exams can also use an optional web search provider. Mock exams can parse text-based PDF past papers when the file URL is accessible.
 
 ## Run
 
@@ -39,6 +39,9 @@ PEZMAX_WEB_SEARCH_PROVIDER=tavily|serpapi|searxng
 PEZMAX_WEB_SEARCH_API_KEY=
 PEZMAX_WEB_SEARCH_BASE_URL=
 PEZMAX_WEB_SEARCH_TIMEOUT_SECONDS=12
+PEZMAX_FILE_BASE_URL=
+PEZMAX_DOCUMENT_TIMEOUT_SECONDS=15
+PEZMAX_DOCUMENT_MAX_BYTES=15728640
 ```
 
 Web search provider notes:
@@ -185,7 +188,7 @@ Content-Type: application/json
 ```
 
 The agent first searches platform files. If no matching papers or materials exist, the response explicitly says so and uses web search sources, when configured, to provide appropriate study advice.
-For web results, the agent also attempts to fetch HTML/text page excerpts for content analysis. PDF OCR/text extraction is not included yet, so PDF-only pages are summarized from search snippets unless a future document extractor is added.
+For web results, the agent also attempts to fetch HTML/text page excerpts for content analysis.
 
 ```json
 {
@@ -222,7 +225,9 @@ You can also provide specific source papers:
 }
 ```
 
-The agent searches platform past papers first. If no platform papers are found, the response says so explicitly and generates practice questions from web sources and subject knowledge structure.
+The agent searches platform past papers first. It then attempts to download accessible `fileUrl` documents and extract text from text-based PDFs or plain text files. The response includes `documentTexts`, so the frontend can show which papers were actually parsed. Scanned image PDFs may return an extraction error until OCR is added.
+
+If no platform papers are found, the response says so explicitly and generates practice questions from web sources and subject knowledge structure.
 
 ### Organize favorites
 

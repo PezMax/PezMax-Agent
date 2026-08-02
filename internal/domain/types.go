@@ -156,11 +156,21 @@ type MockExamResponse struct {
 	HasPastPapers    bool               `json:"hasPastPapers"`
 	PaperAnalysis    string             `json:"paperAnalysis,omitempty"`
 	SourceFiles      []FileItem         `json:"sourceFiles,omitempty"`
+	DocumentTexts    []DocumentText     `json:"documentTexts,omitempty"`
 	WebSources       []WebSearchResult  `json:"webSources,omitempty"`
 	Questions        []MockQuestion     `json:"questions"`
 	RecommendedFiles []FileSearchResult `json:"recommendedFiles,omitempty"`
 	Suggestions      []string           `json:"suggestions,omitempty"`
 	Summary          string             `json:"summary"`
+}
+
+type DocumentText struct {
+	FileID   int64  `json:"fileId,omitempty"`
+	FileName string `json:"fileName,omitempty"`
+	FileURL  string `json:"fileUrl,omitempty"`
+	Format   string `json:"fileFormat,omitempty"`
+	Text     string `json:"text,omitempty"`
+	Error    string `json:"error,omitempty"`
 }
 
 type MockQuestion struct {

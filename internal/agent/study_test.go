@@ -59,7 +59,7 @@ func TestBuildFallbackMockQuestions(t *testing.T) {
 		Difficulty:    "中等",
 	}
 
-	questions := buildFallbackMockQuestions(req, []domain.FileItem{{FileID: 1, Name: "高等数学期末真题.pdf"}}, nil)
+	questions := buildFallbackMockQuestions(req, []domain.FileItem{{FileID: 1, Name: "高等数学期末真题.pdf"}}, nil, nil)
 	if len(questions) != 5 {
 		t.Fatalf("len(questions) = %d, want 5", len(questions))
 	}
