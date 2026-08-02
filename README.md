@@ -218,6 +218,22 @@ Content-Type: application/json
 
 The response contains report clues, related file metadata, audit risk, and next actions.
 
+### Platform operation insights
+
+```http
+POST /api/v1/agent/ops/insights
+Content-Type: application/json
+
+{
+  "pageNum": 1,
+  "pageSize": 200,
+  "subject": "高等数学",
+  "includeNotifications": true
+}
+```
+
+The response contains overview metrics, hot files, low-quality file risks, report pressure, uploader ranking insights, notification reach suggestions, and operation suggestions.
+
 ## Verify
 
 ```powershell

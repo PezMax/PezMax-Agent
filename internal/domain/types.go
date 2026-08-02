@@ -27,6 +27,42 @@ type FileItem struct {
 	Remark   string `json:"remark,omitempty"`
 }
 
+type DownloadItem struct {
+	DownloadID int64  `json:"downloadId"`
+	FileID     int64  `json:"fileId,omitempty"`
+	UserID     int64  `json:"userId,omitempty"`
+	CreateBy   string `json:"creatBy,omitempty"`
+	CreateTime string `json:"creatTime,omitempty"`
+	Remark     string `json:"remark,omitempty"`
+}
+
+type NotificationItem struct {
+	NotifyID              int64  `json:"notifyId"`
+	NotifyType            string `json:"notifyType,omitempty"`
+	Title                 string `json:"title,omitempty"`
+	Content               string `json:"content,omitempty"`
+	Status                string `json:"status,omitempty"`
+	Sort                  int64  `json:"sort,omitempty"`
+	DisplayMode           string `json:"displayMode,omitempty"`
+	UploadUserID          int64  `json:"uploadUserId,omitempty"`
+	MaterialID            int64  `json:"materialId,omitempty"`
+	MaterialTitleSnapshot string `json:"materialTitleSnapshot,omitempty"`
+	PublishStart          string `json:"publishStart,omitempty"`
+	PublishEnd            string `json:"publishEnd,omitempty"`
+	CreateTime            string `json:"createTime,omitempty"`
+	Remark                string `json:"remark,omitempty"`
+}
+
+type UploaderRankItem struct {
+	UserID     int64  `json:"userId"`
+	UserName   string `json:"userName,omitempty"`
+	NickName   string `json:"nickName,omitempty"`
+	Avatar     string `json:"avatar,omitempty"`
+	Count      int64  `json:"count"`
+	Remark     string `json:"remark,omitempty"`
+	CreateTime string `json:"createTime,omitempty"`
+}
+
 type FileSearchResponse struct {
 	Intent      string             `json:"intent"`
 	Filters     FileSearchRequest  `json:"filters"`
@@ -132,6 +168,78 @@ type ReportSummary struct {
 	Clues        []string        `json:"clues"`
 	NextActions  []string        `json:"nextActions"`
 	TimelineText string          `json:"timelineText,omitempty"`
+}
+
+type OpsInsightRequest struct {
+	PageNum              int    `json:"pageNum,omitempty"`
+	PageSize             int    `json:"pageSize,omitempty"`
+	School               string `json:"school,omitempty"`
+	Subject              string `json:"subject,omitempty"`
+	Year                 int    `json:"year,omitempty"`
+	IncludeNotifications bool   `json:"includeNotifications,omitempty"`
+}
+
+type OpsInsightResponse struct {
+	Intent            string                        `json:"intent"`
+	Filters           FileSearchRequest             `json:"filters"`
+	Overview          OpsOverview                   `json:"overview"`
+	HotFiles          []HotFileInsight              `json:"hotFiles"`
+	LowQualityFiles   []QualityIssueInsight         `json:"lowQualityFiles"`
+	ReportPressure    []ReportPressureInsight       `json:"reportPressure"`
+	RankTrends        []UploaderRankInsight         `json:"rankTrends"`
+	NotificationReach []NotificationReachSuggestion `json:"notificationReach,omitempty"`
+	Suggestions       []string                      `json:"suggestions,omitempty"`
+	Summary           string                        `json:"summary"`
+}
+
+type OpsOverview struct {
+	FileCount         int    `json:"fileCount"`
+	DownloadCount     int    `json:"downloadCount"`
+	ReportCount       int    `json:"reportCount"`
+	NotificationCount int    `json:"notificationCount"`
+	HighRiskCount     int    `json:"highRiskCount"`
+	HotSubject        string `json:"hotSubject,omitempty"`
+	HotSchool         string `json:"hotSchool,omitempty"`
+}
+
+type HotFileInsight struct {
+	File          FileItem `json:"file"`
+	DownloadCount int      `json:"downloadCount"`
+	ReportCount   int      `json:"reportCount"`
+	HotScore      int      `json:"hotScore"`
+	Reasons       []string `json:"reasons"`
+}
+
+type QualityIssueInsight struct {
+	File      FileItem `json:"file"`
+	RiskLevel string   `json:"riskLevel"`
+	Score     int      `json:"score"`
+	Reasons   []string `json:"reasons"`
+}
+
+type ReportPressureInsight struct {
+	FileID      int64     `json:"fileId"`
+	File        *FileItem `json:"file,omitempty"`
+	ReportCount int       `json:"reportCount"`
+	RiskLevel   string    `json:"riskLevel"`
+	Reasons     []string  `json:"reasons"`
+}
+
+type UploaderRankInsight struct {
+	Rank    int              `json:"rank"`
+	User    UploaderRankItem `json:"user"`
+	Trend   string           `json:"trend"`
+	Insight string           `json:"insight"`
+}
+
+type NotificationReachSuggestion struct {
+	Type          string  `json:"type"`
+	Title         string  `json:"title"`
+	Audience      string  `json:"audience"`
+	Priority      string  `json:"priority"`
+	DraftContent  string  `json:"draftContent"`
+	RelatedFileID int64   `json:"relatedFileId,omitempty"`
+	Confidence    float64 `json:"confidence"`
 }
 
 type MetadataSuggestRequest struct {

@@ -30,6 +30,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/agent/files/audit/suggest", h.suggestAudit)
 	mux.HandleFunc("POST /api/v1/agent/favorites/organize", h.organizeFavorites)
 	mux.HandleFunc("POST /api/v1/agent/reports/summarize", h.summarizeReports)
+	mux.HandleFunc("POST /api/v1/agent/ops/insights", h.opsInsights)
 	return withCORS(mux)
 }
 
@@ -137,6 +138,21 @@ func (h *Handler) summarizeReports(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.service.SummarizeReports(requestContext(r), req)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) opsInsights(w http.ResponseWriter, r *http.Request) {
+	var req domain.OpsInsightRequest
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	resp, err := h.service.OpsInsights(requestContext(r), req)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

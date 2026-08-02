@@ -35,6 +35,46 @@ func NewJavaClient(cfg config.Config) *JavaClient {
 	}
 }
 
+func (c *JavaClient) ListFiles(ctx context.Context, req domain.FileSearchRequest) ([]domain.FileItem, error) {
+	if c.baseURL == "" {
+		log.Printf("skip backend file list: PEZMAX_BACKEND_BASE_URL is empty")
+		return nil, nil
+	}
+	if req.PageNum <= 0 {
+		req.PageNum = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 200
+	}
+
+	values := url.Values{}
+	if req.School != "" {
+		values.Set("fileSchool", req.School)
+	}
+	if req.Subject != "" {
+		values.Set("fileSubject", req.Subject)
+	}
+	if req.Year > 0 {
+		values.Set("fileYear", strconv.Itoa(req.Year))
+	}
+	if req.Type > 0 {
+		values.Set("fileType", strconv.Itoa(req.Type))
+	}
+	values.Set("pageNum", strconv.Itoa(req.PageNum))
+	values.Set("pageSize", strconv.Itoa(req.PageSize))
+
+	body, err := c.get(ctx, "/datum/file/list", values)
+	if err != nil {
+		return nil, err
+	}
+	items, err := decodeFileItems(body)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("backend file list decoded rows=%d", len(items))
+	return items, nil
+}
+
 func (c *JavaClient) SearchFiles(ctx context.Context, req domain.FileSearchRequest) ([]domain.FileItem, error) {
 	if c.baseURL == "" {
 		log.Printf("skip backend file search: PEZMAX_BACKEND_BASE_URL is empty")
@@ -157,6 +197,33 @@ func (c *JavaClient) ListFavorites(ctx context.Context, userID int64, pageNum in
 	return c.enrichFiles(ctx, items), nil
 }
 
+func (c *JavaClient) ListDownloads(ctx context.Context, pageNum int, pageSize int) ([]domain.DownloadItem, error) {
+	if c.baseURL == "" {
+		log.Printf("skip backend download list: PEZMAX_BACKEND_BASE_URL is empty")
+		return nil, nil
+	}
+	if pageNum <= 0 {
+		pageNum = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 200
+	}
+
+	values := url.Values{}
+	values.Set("pageNum", strconv.Itoa(pageNum))
+	values.Set("pageSize", strconv.Itoa(pageSize))
+	body, err := c.get(ctx, "/datum/download/list", values)
+	if err != nil {
+		return nil, err
+	}
+	items, err := decodeDownloadItems(body)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("backend download list decoded rows=%d", len(items))
+	return items, nil
+}
+
 func (c *JavaClient) ListReports(ctx context.Context, req domain.ReportQuery) ([]domain.ReportItem, error) {
 	if c.baseURL == "" {
 		log.Printf("skip backend report list: PEZMAX_BACKEND_BASE_URL is empty")
@@ -220,6 +287,51 @@ func (c *JavaClient) GetReport(ctx context.Context, reportID int64) (*domain.Rep
 		return nil, fmt.Errorf("backend report %d not found", reportID)
 	}
 	return &reports[0], nil
+}
+
+func (c *JavaClient) ListNotifications(ctx context.Context, pageNum int, pageSize int) ([]domain.NotificationItem, error) {
+	if c.baseURL == "" {
+		log.Printf("skip backend notification list: PEZMAX_BACKEND_BASE_URL is empty")
+		return nil, nil
+	}
+	if pageNum <= 0 {
+		pageNum = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+
+	values := url.Values{}
+	values.Set("pageNum", strconv.Itoa(pageNum))
+	values.Set("pageSize", strconv.Itoa(pageSize))
+	body, err := c.get(ctx, "/system/notification/list", values)
+	if err != nil {
+		return nil, err
+	}
+	items, err := decodeNotificationItems(body)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("backend notification list decoded rows=%d", len(items))
+	return items, nil
+}
+
+func (c *JavaClient) ListUploadRanks(ctx context.Context) ([]domain.UploaderRankItem, error) {
+	if c.baseURL == "" {
+		log.Printf("skip backend upload rank: PEZMAX_BACKEND_BASE_URL is empty")
+		return nil, nil
+	}
+
+	body, err := c.get(ctx, "/datum/user/rank", nil)
+	if err != nil {
+		return nil, err
+	}
+	items, err := decodeUploadRanks(body)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("backend upload rank decoded rows=%d", len(items))
+	return items, nil
 }
 
 func (c *JavaClient) enrichFiles(ctx context.Context, items []domain.FileItem) []domain.FileItem {
@@ -460,6 +572,113 @@ func decodeReportItems(body []byte) ([]domain.ReportItem, error) {
 	}
 	var dataTable struct {
 		Rows []domain.ReportItem `json:"rows"`
+	}
+	if err := json.Unmarshal(ajax.Data, &dataTable); err != nil {
+		return nil, err
+	}
+	return dataTable.Rows, nil
+}
+
+func decodeDownloadItems(body []byte) ([]domain.DownloadItem, error) {
+	var direct []domain.DownloadItem
+	if err := json.Unmarshal(body, &direct); err == nil {
+		return direct, nil
+	}
+
+	var table struct {
+		Rows []domain.DownloadItem `json:"rows"`
+	}
+	if err := json.Unmarshal(body, &table); err == nil && table.Rows != nil {
+		return table.Rows, nil
+	}
+
+	var ajax struct {
+		Data json.RawMessage       `json:"data"`
+		Rows []domain.DownloadItem `json:"rows"`
+	}
+	if err := json.Unmarshal(body, &ajax); err != nil {
+		return nil, err
+	}
+	if len(ajax.Rows) > 0 {
+		return ajax.Rows, nil
+	}
+	if len(ajax.Data) == 0 {
+		return nil, nil
+	}
+	if err := json.Unmarshal(ajax.Data, &direct); err == nil {
+		return direct, nil
+	}
+	var dataTable struct {
+		Rows []domain.DownloadItem `json:"rows"`
+	}
+	if err := json.Unmarshal(ajax.Data, &dataTable); err != nil {
+		return nil, err
+	}
+	return dataTable.Rows, nil
+}
+
+func decodeNotificationItems(body []byte) ([]domain.NotificationItem, error) {
+	var direct []domain.NotificationItem
+	if err := json.Unmarshal(body, &direct); err == nil {
+		return direct, nil
+	}
+
+	var table struct {
+		Rows []domain.NotificationItem `json:"rows"`
+	}
+	if err := json.Unmarshal(body, &table); err == nil && table.Rows != nil {
+		return table.Rows, nil
+	}
+
+	var ajax struct {
+		Data json.RawMessage           `json:"data"`
+		Rows []domain.NotificationItem `json:"rows"`
+	}
+	if err := json.Unmarshal(body, &ajax); err != nil {
+		return nil, err
+	}
+	if len(ajax.Rows) > 0 {
+		return ajax.Rows, nil
+	}
+	if len(ajax.Data) == 0 {
+		return nil, nil
+	}
+	if err := json.Unmarshal(ajax.Data, &direct); err == nil {
+		return direct, nil
+	}
+	var dataTable struct {
+		Rows []domain.NotificationItem `json:"rows"`
+	}
+	if err := json.Unmarshal(ajax.Data, &dataTable); err != nil {
+		return nil, err
+	}
+	return dataTable.Rows, nil
+}
+
+func decodeUploadRanks(body []byte) ([]domain.UploaderRankItem, error) {
+	var direct []domain.UploaderRankItem
+	if err := json.Unmarshal(body, &direct); err == nil {
+		return direct, nil
+	}
+
+	var ajax struct {
+		Data json.RawMessage           `json:"data"`
+		Rows []domain.UploaderRankItem `json:"rows"`
+	}
+	if err := json.Unmarshal(body, &ajax); err != nil {
+		return nil, err
+	}
+	if len(ajax.Rows) > 0 {
+		return ajax.Rows, nil
+	}
+	if len(ajax.Data) == 0 {
+		return nil, nil
+	}
+	if err := json.Unmarshal(ajax.Data, &direct); err == nil {
+		return direct, nil
+	}
+	var dataTable struct {
+		Rows []domain.UploaderRankItem `json:"rows"`
 	}
 	if err := json.Unmarshal(ajax.Data, &dataTable); err != nil {
 		return nil, err
